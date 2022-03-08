@@ -17,10 +17,12 @@ import { dedot } from './utils/dedot';
 import { ApmElasticsearchOutputWriteTargets } from './apm/utils/get_apm_write_targets';
 import { Logger } from './utils/create_logger';
 import { Fields } from './entity';
+import { StreamAggregator } from './stream_aggregator';
 
 export interface StreamProcessorOptions<TFields extends Fields = ApmFields> {
   version?: string;
   processors: Array<(events: TFields[]) => TFields[]>;
+  streamAggregators: StreamAggregator[];
   flushInterval?: string;
   // defaults to 10k
   maxBufferSize?: number;
