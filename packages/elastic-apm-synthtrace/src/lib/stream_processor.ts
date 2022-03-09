@@ -22,7 +22,7 @@ import { StreamAggregator } from './stream_aggregator';
 export interface StreamProcessorOptions<TFields extends Fields = ApmFields> {
   version?: string;
   processors: Array<(events: TFields[]) => TFields[]>;
-  streamAggregators: StreamAggregator[];
+  streamAggregators: Array<StreamAggregator<TFields>>;
   flushInterval?: string;
   // defaults to 10k
   maxBufferSize?: number;
@@ -75,6 +75,13 @@ export class StreamProcessor<TFields extends Fields = ApmFields> {
 
         yield StreamProcessor.enrich(event, this.version, this.versionMajor);
         sourceEventsYielded++;
+        for (const aggregator of this.options.streamAggregators) {
+          const aggregatedEvents = aggregator.process(event);
+          yield* aggregatedEvents.map((d) =>
+            StreamProcessor.enrich(d, this.version, this.versionMajor)
+          );
+        }
+
         if (sourceEventsYielded % maxBufferSize === 0) {
           if (this.options?.processedCallback) {
             this.options.processedCallback(maxBufferSize);
