@@ -15,6 +15,7 @@ import { EntityIterable } from '../../entity_iterable';
 import { StreamProcessor } from '../../stream_processor';
 import { EntityStreams } from '../../entity_streams';
 import { Fields } from '../../entity';
+import { StreamAggregator } from '../../stream_aggregator';
 
 export interface StreamToBulkOptions<TFields extends Fields = ApmFields> {
   concurrency?: number;
@@ -149,7 +150,6 @@ export class ApmSynthtraceEsClient {
     streamProcessor?: StreamProcessor
   ) {
     const dataStream = Array.isArray(events) ? new EntityStreams(events) : events;
-
     const sp =
       streamProcessor != null
         ? streamProcessor
@@ -197,11 +197,12 @@ export class ApmSynthtraceEsClient {
           options?.itemStartStopCallback?.apply(this, [item, false]);
           yielded++;
         }
-        const index = options?.mapToIndex
-          ? options?.mapToIndex(item)
-          : !this.forceLegacyIndices
-          ? StreamProcessor.getDataStreamForEvent(item, writeTargets)
-          : StreamProcessor.getIndexForEvent(item, writeTargets);
+        let index = options?.mapToIndex ? options?.mapToIndex(item) : null;
+        if (!index) {
+          index = !this.forceLegacyIndices
+            ? sp.getDataStreamForEvent(item, writeTargets)
+            : StreamProcessor.getIndexForEvent(item, writeTargets);
+        }
         return { create: { _index: index } };
       },
     });
@@ -210,5 +211,47 @@ export class ApmSynthtraceEsClient {
     if (this.refreshAfterIndex) {
       await this.refresh();
     }
+  }
+
+  async createDataStream(aggregator: StreamAggregator) {
+    const datastreamName = aggregator.getDataStreamName();
+    const mappings = aggregator.getMappings();
+    const dimensions = aggregator.getDimensions();
+
+    if (dimensions.length === 0) return;
+
+    await this.client.cluster.putComponentTemplate({
+      name: `${datastreamName}-mappings`,
+      template: {
+        mappings,
+      },
+      _meta: {
+        description: `Mappings for ${datastreamName}-*`,
+      },
+    });
+
+    await this.client.cluster.putComponentTemplate({
+      name: `${datastreamName}-settings`,
+      template: {
+        settings: {
+          index: {
+            lifecycle: { name: 'metrics' },
+            mode: 'time_series',
+            routing_path: dimensions,
+          },
+        },
+      },
+      _meta: {
+        description: `Settings for ${datastreamName}-*`,
+      },
+    });
+
+    await this.client.indices.putIndexTemplate({
+      name: `${datastreamName}-index_template`,
+      index_patterns: [`${datastreamName}-*`],
+      data_stream: {},
+      composed_of: [`${datastreamName}-mappings`, `${datastreamName}-settings`],
+      priority: 500,
+    });
   }
 }

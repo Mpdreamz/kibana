@@ -290,7 +290,7 @@ exports.Cluster = class Cluster {
 
     const esArgs = [
       'action.destructive_requires_name=true',
-      'ingest.geoip.downloader.enabled=false',
+      'ingest.geoip.downloader.enabled=true',
       'search.check_ccs_compatibility=true',
       'cluster.routing.allocation.disk.threshold_enabled=false',
     ].concat(options.esArgs || []);
