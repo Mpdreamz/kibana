@@ -14,7 +14,9 @@ import { StreamAggregator } from '../../stream_aggregator';
 
 interface LatencyState {
   count: number;
-  mean: number;
+  min: number;
+  max: number;
+  sum: number;
   timestamp: number;
 }
 
@@ -29,8 +31,7 @@ export type ServiceFields = Fields &
     'service.name': string;
     'service.version': string;
     'service.environment': string;
-    'service.latency_mean': number;
-    'service.latency_count': number;
+    'service.latency': { min: number; max: number; sum: number; value_count: number };
   }>;
 
 export class ServiceLatencyAggregator implements StreamAggregator<ApmFields> {
@@ -61,12 +62,9 @@ export class ServiceLatencyAggregator implements StreamAggregator<ApmFields> {
               type: 'keyword',
               time_series_dimension: true,
             },
-            latency_mean: {
-              type: 'double',
-              time_series_metric: 'gauge',
-            },
-            latency_count: {
-              type: 'long',
+            latency: {
+              type: 'aggregate_metric_double',
+              metrics: ['min', 'max', 'sum', 'value_count'],
               time_series_metric: 'gauge',
             },
           },
@@ -100,14 +98,19 @@ export class ServiceLatencyAggregator implements StreamAggregator<ApmFields> {
     if (!this.state[service]) {
       this.state[service] = {
         count: 0,
-        mean: 0,
+        min: 0,
+        max: 0,
+        sum: 0,
         timestamp: event['@timestamp'],
       };
     }
     const duration = Number(event['transaction.duration.us']);
-    const count = ++this.state[service].count;
-    const differential = (duration - this.state[service].mean) / count;
-    this.state[service].mean = this.state[service].mean + differential;
+    const state = this.state[service];
+
+    state.count++;
+    state.sum += duration;
+    if (duration > state.max) state.max = duration;
+    if (duration < state.min) state.min = Math.min(0, duration);
 
     if (Object.keys(this.state).length === 1000) {
       return this.createFieldsFromState();
@@ -141,8 +144,12 @@ export class ServiceLatencyAggregator implements StreamAggregator<ApmFields> {
       'metricset.name': 'service',
       'processor.event': 'service',
       'service.name': service,
-      'service.latency_mean': this.state[service].mean,
-      'service.latency_count': this.state[service].count,
+      'service.latency': {
+        min: this.state[service].min,
+        max: this.state[service].max,
+        sum: this.state[service].sum,
+        value_count: this.state[service].count,
+      },
     };
   }
 
