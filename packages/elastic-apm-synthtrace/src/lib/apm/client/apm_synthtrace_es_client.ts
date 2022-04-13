@@ -58,7 +58,7 @@ export class ApmSynthtraceEsClient {
     return info.version.number;
   }
 
-  async clean() {
+  async clean(dataStreams?: string[]) {
     return this.getWriteTargets().then(async (writeTargets) => {
       const indices = Object.values(writeTargets);
       this.logger.info(`Attempting to clean: ${indices}`);
@@ -69,7 +69,7 @@ export class ApmSynthtraceEsClient {
           logger: this.logger,
         });
       }
-      for (const name of indices) {
+      for (const name of indices.concat(dataStreams ?? [])) {
         const dataStream = await this.client.indices.getDataStream({ name }, { ignore: [404] });
         if (dataStream.data_streams && dataStream.data_streams.length > 0) {
           this.logger.debug(`Deleting datastream: ${name}`);
@@ -165,7 +165,7 @@ export class ApmSynthtraceEsClient {
       await this.logger.perf('enumerate_scenario', async () => {
         // @ts-ignore
         // We just want to enumerate
-        for await (item of sp.streamToDocumentAsync(sp.toDocument, dataStream)) {
+        for await (item of sp.streamToDocumentAsync((e) => sp.toDocument(e), dataStream)) {
           if (yielded === 0) {
             options.itemStartStopCallback?.apply(this, [item, false]);
             yielded++;
@@ -185,7 +185,7 @@ export class ApmSynthtraceEsClient {
       flushBytes: 500000,
       // TODO https://github.com/elastic/elasticsearch-js/issues/1610
       // having to map here is awkward, it'd be better to map just before serialization.
-      datasource: sp.streamToDocumentAsync(sp.toDocument, dataStream),
+      datasource: sp.streamToDocumentAsync((e) => sp.toDocument(e), dataStream),
       onDrop: (doc) => {
         this.logger.info(JSON.stringify(doc, null, 2));
       },
@@ -229,6 +229,7 @@ export class ApmSynthtraceEsClient {
         description: `Mappings for ${datastreamName}-*`,
       },
     });
+    this.logger.info(`Created mapping component template for ${datastreamName}-*`);
 
     await this.client.cluster.putComponentTemplate({
       name: `${datastreamName}-settings`,
@@ -245,6 +246,7 @@ export class ApmSynthtraceEsClient {
         description: `Settings for ${datastreamName}-*`,
       },
     });
+    this.logger.info(`Created settings component template for ${datastreamName}-*`);
 
     await this.client.indices.putIndexTemplate({
       name: `${datastreamName}-index_template`,
@@ -253,5 +255,8 @@ export class ApmSynthtraceEsClient {
       composed_of: [`${datastreamName}-mappings`, `${datastreamName}-settings`],
       priority: 500,
     });
+    this.logger.info(`Created index template for ${datastreamName}-*`);
+
+    await this.client.indices.createDataStream({ name: datastreamName + '-default' });
   }
 }

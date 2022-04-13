@@ -144,10 +144,6 @@ export class StreamProcessor<TFields extends Fields = ApmFields> {
     }
   }
 
-  public aggregatorBootstrap(): Array<(esClient: Client) => Promise<void>> {
-    return this.streamAggregators.map((a) => a.bootstrapElasticsearch);
-  }
-
   private calculateFlushAfter(eventDate: number | null, order: 'asc' | 'desc') {
     if (order === 'desc') {
       return moment(eventDate).subtract(this.intervalAmount, this.intervalUnit).valueOf();
