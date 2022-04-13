@@ -65,6 +65,7 @@ export class ServiceLatencyAggregator implements StreamAggregator<ApmFields> {
             latency: {
               type: 'aggregate_metric_double',
               metrics: ['min', 'max', 'sum', 'value_count'],
+              default_metric: 'sum',
               time_series_metric: 'gauge',
             },
           },
