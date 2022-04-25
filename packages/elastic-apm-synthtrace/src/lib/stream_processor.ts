@@ -7,7 +7,6 @@
  */
 
 import moment from 'moment';
-import { Client } from '@elastic/elasticsearch';
 import { ApmFields } from './apm/apm_fields';
 import { EntityIterable } from './entity_iterable';
 import { getTransactionMetrics } from './apm/processors/get_transaction_metrics';
