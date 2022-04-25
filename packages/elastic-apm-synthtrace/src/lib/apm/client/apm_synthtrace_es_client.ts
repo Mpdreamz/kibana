@@ -206,19 +206,6 @@ export class ApmSynthtraceEsClient {
         return { create: { _index: index } };
       },
     });
-    options?.itemStartStopCallback?.apply(this, [item, true]);
-
-    if (this.refreshAfterIndex) {
-      await this.refresh();
-    }
-  }
-
-  async createDataStream(aggregator: StreamAggregator) {
-    const datastreamName = aggregator.getDataStreamName();
-    const mappings = aggregator.getMappings();
-    const dimensions = aggregator.getDimensions();
-
-    if (dimensions.length === 0) return;
 
     await this.client.cluster.putComponentTemplate({
       name: `${datastreamName}-mappings`,
