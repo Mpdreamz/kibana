@@ -15,7 +15,7 @@ import { parseRunCliFlags } from './utils/parse_run_cli_flags';
 import { getCommonServices } from './utils/get_common_services';
 import { ApmSynthtraceKibanaClient } from '../lib/apm/client/apm_synthtrace_kibana_client';
 import { StreamAggregator } from '../lib/stream_aggregator';
-import {ServiceLatencyAggregator} from "../lib/apm/aggregators/service_latency_aggregator";
+import { ServiceLatencyAggregator } from '../lib/apm/aggregators/service_latency_aggregator';
 
 function options(y: Argv) {
   return y
@@ -190,7 +190,7 @@ yargs(process.argv.slice(2))
 
       const aggregators: StreamAggregator[] = [new ServiceLatencyAggregator()];
       if (argv.clean) {
-        await apmEsClient.clean(aggregators.map((a) => a.getDataStreamName() + '-default'));
+        await apmEsClient.clean(aggregators.map((a) => a.getDataStreamName() + '-*'));
       }
       if (runOptions.gcpRepository) {
         await apmEsClient.registerGcpRepository(runOptions.gcpRepository);
@@ -218,5 +218,4 @@ yargs(process.argv.slice(2))
       }
     }
   )
-  .showHelpOnFail(false)
   .parse();
