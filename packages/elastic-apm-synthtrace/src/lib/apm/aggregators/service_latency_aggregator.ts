@@ -137,7 +137,7 @@ export class ServiceLatencyAggregator implements StreamAggregator<ApmFields> {
     if (duration < state.min) state.min = Math.min(0, duration);
 
     if (Object.keys(this.state).length === 1000) {
-      return this.createFieldsFromState();
+      return this.flush();
     }
 
     const diff = Math.abs(event['@timestamp'] - this.state[service].timestamp);
@@ -150,10 +150,6 @@ export class ServiceLatencyAggregator implements StreamAggregator<ApmFields> {
   }
 
   flush(): Fields[] {
-    return this.createFieldsFromState();
-  }
-
-  private createFieldsFromState(): ServiceFields[] {
     const fields = Object.keys(this.state).map((key) => this.createServiceFields(key));
     this.state = {};
     return fields;
